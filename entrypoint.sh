@@ -25,25 +25,16 @@ echo "Killing health server..."
 kill %1 2>/dev/null
 sleep 1
 
-# Add pgbouncer=true so Prisma doesn't use prepared statements through pooler
-export DATABASE_CONNECTION_URI="${DATABASE_CONNECTION_URI}?pgbouncer=true"
-echo "DB URI (pgbouncer mode): $(echo $DATABASE_CONNECTION_URI | sed 's/:W[^@]*@/:****@/')"
-
 # Copy migration files
 echo "Setting up Prisma migrations..."
 rm -rf ./prisma/migrations 2>/dev/null
 cp -r ./prisma/postgresql-migrations ./prisma/migrations 2>/dev/null
 
-# Run migration SQL through pooler using Node.js script
-# (prisma migrate deploy uses prepared statements which PgBouncer blocks)
-echo "Running migrations via pooler..."
-node /evolution/migrate-via-pooler.mjs 2>&1
+# Run migrations (direct PostgreSQL, no PgBouncer issues)
+echo "Running Prisma migrate deploy..."
+./node_modules/.bin/prisma migrate deploy --schema ./prisma/postgresql-schema.prisma 2>&1
 MIGRATE_EXIT=$?
 echo "Migration exit code: $MIGRATE_EXIT"
-
-if [ $MIGRATE_EXIT -ne 0 ]; then
-  echo "Migration failed, but continuing to generate and start..."
-fi
 
 echo "Running Prisma generate..."
 ./node_modules/.bin/prisma generate --schema ./prisma/postgresql-schema.prisma 2>&1
