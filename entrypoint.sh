@@ -15,40 +15,19 @@ while True:
     c, a = s.accept()
     threading.Thread(target=handle, args=(c,)).start()
 " &
-echo "Health server started (PID: $!)"
+echo "Health server started"
 
 # Give Render time to detect port 8080
 sleep 8
-
-# Build session pooler URL (port 5432) from current DATABASE_URL (port 6543)
-# Session pooler supports Prisma migrations; transaction pooler doesn't
-SESSION_DB_URL=$(echo "$DATABASE_URL" | sed 's/:6543\//:5432\//')
-echo "Using session pooler URL for migration..."
-
-export DATABASE_PROVIDER=psql_bouncer
-export DATABASE_URL="$SESSION_DB_URL"
-export DATABASE_BOUNCER_CONNECTION_URI="$SESSION_DB_URL"
 
 # Kill health server to free port 8080
 echo "Killing health server..."
 kill %1 2>/dev/null
 sleep 1
 
-# Copy migration files
-echo "Setting up Prisma migrations..."
-rm -rf ./prisma/migrations 2>/dev/null
-cp -r ./prisma/postgresql-migrations ./prisma/migrations 2>/dev/null
-
-# Run migration (session pooler lets Prisma work)
-echo "Running Prisma migrate deploy..."
-./node_modules/.bin/prisma migrate deploy --schema ./prisma/psql_bouncer-schema.prisma 2>&1
-MIGRATE_EXIT=$?
-echo "Migration exit code: $MIGRATE_EXIT"
-
-echo "Running Prisma generate..."
-./node_modules/.bin/prisma generate --schema ./prisma/psql_bouncer-schema.prisma 2>&1
-GENERATE_EXIT=$?
-echo "Generate exit code: $GENERATE_EXIT"
+# Set PgBouncer-compatible env vars for generated Prisma client
+export DATABASE_PROVIDER=psql_bouncer
+export DATABASE_BOUNCER_CONNECTION_URI="${DATABASE_URL}"
 
 # Start Evolution API
 echo "Starting Evolution API on port 8080..."
