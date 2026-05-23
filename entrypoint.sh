@@ -17,41 +17,34 @@ while True:
 " &
 echo "Health server started"
 
-# Give Render time to detect port
-sleep 8
-
-# Set environment for PgBouncer-compatible Prisma
+# Set PgBouncer-compatible env
 export DATABASE_PROVIDER=psql_bouncer
-
-# psql_bouncer schema needs this env var — derive from DATABASE_URL
 export DATABASE_BOUNCER_CONNECTION_URI="${DATABASE_URL}"
 
-# Copy migration files (psql_bouncer uses the same migrations as postgresql)
-echo "Setting up Prisma migrations..."
+# Setup migrations in background (with timeout to prevent hanging)
+echo "Setting up migration files..."
 rm -rf ./prisma/migrations 2>/dev/null
 cp -r ./prisma/postgresql-migrations ./prisma/migrations 2>/dev/null
 
-# Run migrations with psql_bouncer schema (PgBouncer compatible)
-echo "Running Prisma migrate deploy with psql_bouncer schema..."
-./node_modules/.bin/prisma migrate deploy --schema ./prisma/psql_bouncer-schema.prisma 2>&1
-MIGRATE_EXIT=$?
-echo "Migration exit code: $MIGRATE_EXIT"
+echo "Starting Prisma migration in background (120s timeout)..."
+( timeout 120 ./node_modules/.bin/prisma migrate deploy --schema ./prisma/psql_bouncer-schema.prisma 2>&1 && echo "Migration succeeded" || echo "Migration failed/timed out" ) &
+MIGRATE_PID=$!
 
-echo "Running Prisma generate with psql_bouncer schema..."
-./node_modules/.bin/prisma generate --schema ./prisma/psql_bouncer-schema.prisma 2>&1
-GENERATE_EXIT=$?
-echo "Generate exit code: $GENERATE_EXIT"
+# Wait for Render to detect port
+sleep 10
 
-# Kill health server to free port 8080
-echo "Killing health server..."
-kill %1 2>/dev/null
-sleep 1
+# Start Evolution API without waiting for migrations
+# If tables don't exist yet, the server logs errors but still responds
+echo "Starting Evolution API on port 8080 (migrations running in background)..."
+node dist/main 2>&1 &
+SERVER_PID=$!
 
-# Start Evolution API with psql_bouncer provider
-export DATABASE_PROVIDER=psql_bouncer
-echo "Starting Evolution API on port 8080..."
-node dist/main 2>&1
-EXIT_CODE=$?
+# Wait for migrations to complete
+wait $MIGRATE_PID 2>/dev/null
 
-echo "Evolution API exited with code: $EXIT_CODE"
+echo "Migration process finished. Server PID: $SERVER_PID"
+# Keep container alive
+wait $SERVER_PID 2>/dev/null
+
+echo "Server exited with code: $?"
 while true; do sleep 3600; done
