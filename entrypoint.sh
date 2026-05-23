@@ -25,11 +25,35 @@ echo "Killing health server..."
 kill %1 2>/dev/null
 sleep 1
 
-# Set PgBouncer-compatible env vars for generated Prisma client
-export DATABASE_PROVIDER=psql_bouncer
-export DATABASE_BOUNCER_CONNECTION_URI="${DATABASE_URL}"
+# Build direct DB URL (bypasses PgBouncer for Prisma migrations)
+# Pooler: aws-0-eu-west-1.pooler.supabase.com:6543
+# Direct: db.<project>.supabase.co:5432
+ORIGINAL_URL="$DATABASE_URL"
+DIRECT_URL=$(echo "$ORIGINAL_URL" | sed 's/aws-0-eu-west-1\.pooler\.supabase\.com:6543/db.mqqzdbcktzmlxylksahj.supabase.co:5432/')
+echo "Direct URL: $DIRECT_URL"
 
-# Start Evolution API
+export DATABASE_PROVIDER=postgresql
+export DATABASE_URL="$DIRECT_URL"
+
+# Copy migration files
+echo "Setting up Prisma migrations..."
+rm -rf ./prisma/migrations 2>/dev/null
+cp -r ./prisma/postgresql-migrations ./prisma/migrations 2>/dev/null
+
+# Run migration using direct DB connection
+echo "Running Prisma migrate deploy..."
+./node_modules/.bin/prisma migrate deploy --schema ./prisma/postgresql-schema.prisma 2>&1
+MIGRATE_EXIT=$?
+echo "Migration exit code: $MIGRATE_EXIT"
+
+echo "Running Prisma generate..."
+./node_modules/.bin/prisma generate --schema ./prisma/postgresql-schema.prisma 2>&1
+GENERATE_EXIT=$?
+echo "Generate exit code: $GENERATE_EXIT"
+
+# Restore pooler URL and start Evolution API
+export DATABASE_URL="$ORIGINAL_URL"
+
 echo "Starting Evolution API on port 8080..."
 node dist/main 2>&1
 EXIT_CODE=$?
