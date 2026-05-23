@@ -18,24 +18,26 @@ while True:
 echo "Health server started"
 
 # Give Render time to detect port
-sleep 5
+sleep 8
 
-# Run Prisma migrations using local binary (avoids npx hang)
+# Copy migration files  
 echo "Setting up Prisma migrations..."
 rm -rf ./prisma/migrations 2>/dev/null
 cp -r ./prisma/postgresql-migrations ./prisma/migrations 2>/dev/null
 
-echo "Running Prisma migrate deploy..."
-./node_modules/.bin/prisma migrate deploy --schema ./prisma/postgresql-schema.prisma 2>&1
+# Run migrations with timeout (15 seconds to avoid hanging)
+echo "Running Prisma migrate deploy (timeout: 15s)..."
+timeout 15 ./node_modules/.bin/prisma migrate deploy --schema ./prisma/postgresql-schema.prisma 2>&1
 MIGRATE_EXIT=$?
 echo "Migration exit code: $MIGRATE_EXIT"
 
-echo "Running Prisma generate..."
-./node_modules/.bin/prisma generate --schema ./prisma/postgresql-schema.prisma 2>&1
+# Run Prisma generate with timeout
+echo "Running Prisma generate (timeout: 15s)..."
+timeout 15 ./node_modules/.bin/prisma generate --schema ./prisma/postgresql-schema.prisma 2>&1
 GENERATE_EXIT=$?
 echo "Generate exit code: $GENERATE_EXIT"
 
-# Kill health server to free port 8080
+# Kill health server
 echo "Killing health server..."
 kill %1 2>/dev/null
 sleep 1
