@@ -23,6 +23,9 @@ sleep 8
 # Set environment for PgBouncer-compatible Prisma
 export DATABASE_PROVIDER=psql_bouncer
 
+# psql_bouncer schema needs this env var — derive from DATABASE_URL
+export DATABASE_BOUNCER_CONNECTION_URI="${DATABASE_URL}"
+
 # Copy migration files (psql_bouncer uses the same migrations as postgresql)
 echo "Setting up Prisma migrations..."
 rm -rf ./prisma/migrations 2>/dev/null
