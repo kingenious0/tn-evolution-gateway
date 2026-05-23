@@ -20,29 +20,32 @@ echo "Health server started"
 # Give Render time to detect port
 sleep 8
 
-# Copy migration files  
+# Set environment for PgBouncer-compatible Prisma
+export DATABASE_PROVIDER=psql_bouncer
+
+# Copy migration files (psql_bouncer uses the same migrations as postgresql)
 echo "Setting up Prisma migrations..."
 rm -rf ./prisma/migrations 2>/dev/null
 cp -r ./prisma/postgresql-migrations ./prisma/migrations 2>/dev/null
 
-# Run migrations with timeout (15 seconds to avoid hanging)
-echo "Running Prisma migrate deploy (timeout: 15s)..."
-timeout 15 ./node_modules/.bin/prisma migrate deploy --schema ./prisma/postgresql-schema.prisma 2>&1
+# Run migrations with psql_bouncer schema (PgBouncer compatible)
+echo "Running Prisma migrate deploy with psql_bouncer schema..."
+./node_modules/.bin/prisma migrate deploy --schema ./prisma/psql_bouncer-schema.prisma 2>&1
 MIGRATE_EXIT=$?
 echo "Migration exit code: $MIGRATE_EXIT"
 
-# Run Prisma generate with timeout
-echo "Running Prisma generate (timeout: 15s)..."
-timeout 15 ./node_modules/.bin/prisma generate --schema ./prisma/postgresql-schema.prisma 2>&1
+echo "Running Prisma generate with psql_bouncer schema..."
+./node_modules/.bin/prisma generate --schema ./prisma/psql_bouncer-schema.prisma 2>&1
 GENERATE_EXIT=$?
 echo "Generate exit code: $GENERATE_EXIT"
 
-# Kill health server
+# Kill health server to free port 8080
 echo "Killing health server..."
 kill %1 2>/dev/null
 sleep 1
 
-# Start Evolution API
+# Start Evolution API with psql_bouncer provider
+export DATABASE_PROVIDER=psql_bouncer
 echo "Starting Evolution API on port 8080..."
 node dist/main 2>&1
 EXIT_CODE=$?
