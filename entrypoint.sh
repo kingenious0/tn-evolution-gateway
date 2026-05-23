@@ -30,7 +30,7 @@ sleep 1
 # Direct: db.<project>.supabase.co:5432
 # NOTE: Schema uses DATABASE_CONNECTION_URI, not DATABASE_URL!
 ORIGINAL_DB_URI="$DATABASE_CONNECTION_URI"
-DIRECT_DB_URI=$(echo "$ORIGINAL_DB_URI" | sed 's/aws-0-eu-west-1\.pooler\.supabase\.com:6543/db.mqqzdbcktzmlxylksahj.supabase.co:5432/')
+DIRECT_DB_URI=$(echo "$ORIGINAL_DB_URI" | sed 's/aws-0-eu-west-1\.pooler\.supabase\.com:6543\(.*\)/db.mqqzdbcktzmlxylksahj.supabase.co:5432\1?sslmode=require/')
 echo "Direct DB URI: $DIRECT_DB_URI"
 
 export DATABASE_PROVIDER=postgresql
