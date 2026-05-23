@@ -15,18 +15,35 @@ while True:
     c, a = s.accept()
     threading.Thread(target=handle, args=(c,)).start()
 " &
-echo "Health server started. Waiting for Render to detect port..."
-sleep 10
+echo "Health server started"
 
-# Kill health server, free port 8080
-echo "Starting Evolution API..."
+# Give Render time to detect port
+sleep 5
+
+# Run Prisma migrations using local binary (avoids npx hang)
+echo "Setting up Prisma migrations..."
+rm -rf ./prisma/migrations 2>/dev/null
+cp -r ./prisma/postgresql-migrations ./prisma/migrations 2>/dev/null
+
+echo "Running Prisma migrate deploy..."
+./node_modules/.bin/prisma migrate deploy --schema ./prisma/postgresql-schema.prisma 2>&1
+MIGRATE_EXIT=$?
+echo "Migration exit code: $MIGRATE_EXIT"
+
+echo "Running Prisma generate..."
+./node_modules/.bin/prisma generate --schema ./prisma/postgresql-schema.prisma 2>&1
+GENERATE_EXIT=$?
+echo "Generate exit code: $GENERATE_EXIT"
+
+# Kill health server to free port 8080
+echo "Killing health server..."
 kill %1 2>/dev/null
 sleep 1
 
-# Start Evolution API directly (migrations already applied)
+# Start Evolution API
+echo "Starting Evolution API on port 8080..."
 node dist/main 2>&1
 EXIT_CODE=$?
 
-echo "=========================================="
 echo "Evolution API exited with code: $EXIT_CODE"
-echo "=========================================="
+while true; do sleep 3600; done
