@@ -42,11 +42,10 @@ echo "Setting up Prisma migrations..."
 rm -rf ./prisma/migrations 2>/dev/null
 cp -r ./prisma/postgresql-migrations ./prisma/migrations 2>/dev/null
 
-# Run migration using direct DB connection
-echo "Running Prisma migrate deploy..."
-./node_modules/.bin/prisma migrate deploy --schema ./prisma/postgresql-schema.prisma 2>&1
-MIGRATE_EXIT=$?
-echo "Migration exit code: $MIGRATE_EXIT"
+# Dump migration SQL to logs (can't run migrate deploy from Render - Supabase blocks direct port 5432)
+echo "Dumping migration SQL to logs..."
+find ./prisma/migrations -name "migration.sql" -exec echo "=== FILE: {} ===" \; -exec cat {} \; 2>&1
+echo "--- END MIGRATION SQL ---"
 
 echo "Running Prisma generate..."
 ./node_modules/.bin/prisma generate --schema ./prisma/postgresql-schema.prisma 2>&1
