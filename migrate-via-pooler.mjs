@@ -72,6 +72,22 @@ async function runMigrations() {
 
   await ensureTable(client);
 
+  // If Instance table doesn't exist but migrations are recorded, re-apply all
+  let instanceExists = false;
+  try {
+    await client.query('SELECT 1 FROM "Instance" LIMIT 1');
+    instanceExists = true;
+  } catch { /* table doesn't exist */ }
+
+  if (!instanceExists && dirs.length > 0) {
+    const firstApplied = await isApplied(client, dirs[0]);
+    if (firstApplied) {
+      console.log('Instance table missing but migrations recorded — re-running all migrations');
+      await client.query('DROP TABLE IF EXISTS "_prisma_migrations"');
+      await ensureTable(client);
+    }
+  }
+
   for (const dir of dirs) {
     const sqlPath = join(MIGRATIONS_DIR, dir, 'migration.sql');
     if (!existsSync(sqlPath)) {
@@ -87,10 +103,30 @@ async function runMigrations() {
     console.log(`Applying: ${dir}`);
     const sql = readFileSync(sqlPath, 'utf-8');
 
-    const rawStatements = sql.split(/;\s*\r?\n/);
-    const statements = rawStatements
-      .map(s => s.trim().replace(/\r$/, ''))
-      .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('/*'));
+    // Strip comment lines before splitting on ;
+    const lines = sql.split(/\r?\n/);
+    const cleanedLines = [];
+    let inBlockComment = false;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (inBlockComment) {
+        if (trimmed.includes('*/')) inBlockComment = false;
+        continue;
+      }
+      if (trimmed.startsWith('/*') && !trimmed.includes('*/')) {
+        inBlockComment = true;
+        continue;
+      }
+      if (trimmed.startsWith('/*') && trimmed.includes('*/')) {
+        continue;
+      }
+      if (trimmed.startsWith('--')) continue;
+      cleanedLines.push(line);
+    }
+    const statements = cleanedLines.join('\n')
+      .split(/;\s*\r?\n/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
 
     const errors = [];
     for (const stmt of statements) {
