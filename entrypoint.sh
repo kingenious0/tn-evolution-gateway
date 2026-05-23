@@ -28,12 +28,14 @@ sleep 1
 # Build direct DB URL (bypasses PgBouncer for Prisma migrations)
 # Pooler: aws-0-eu-west-1.pooler.supabase.com:6543
 # Direct: db.<project>.supabase.co:5432
-ORIGINAL_URL="$DATABASE_URL"
-DIRECT_URL=$(echo "$ORIGINAL_URL" | sed 's/aws-0-eu-west-1\.pooler\.supabase\.com:6543/db.mqqzdbcktzmlxylksahj.supabase.co:5432/')
-echo "Direct URL: $DIRECT_URL"
+# NOTE: Schema uses DATABASE_CONNECTION_URI, not DATABASE_URL!
+ORIGINAL_DB_URI="$DATABASE_CONNECTION_URI"
+DIRECT_DB_URI=$(echo "$ORIGINAL_DB_URI" | sed 's/aws-0-eu-west-1\.pooler\.supabase\.com:6543/db.mqqzdbcktzmlxylksahj.supabase.co:5432/')
+echo "Direct DB URI: $DIRECT_DB_URI"
 
 export DATABASE_PROVIDER=postgresql
-export DATABASE_URL="$DIRECT_URL"
+export DATABASE_CONNECTION_URI="$DIRECT_DB_URI"
+export DATABASE_URL="$DIRECT_DB_URI"
 
 # Copy migration files
 echo "Setting up Prisma migrations..."
@@ -52,7 +54,8 @@ GENERATE_EXIT=$?
 echo "Generate exit code: $GENERATE_EXIT"
 
 # Restore pooler URL and start Evolution API
-export DATABASE_URL="$ORIGINAL_URL"
+export DATABASE_CONNECTION_URI="$ORIGINAL_DB_URI"
+export DATABASE_URL="$ORIGINAL_DB_URI"
 
 echo "Starting Evolution API on port 8080..."
 node dist/main 2>&1
