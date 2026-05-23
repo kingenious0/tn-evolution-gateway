@@ -25,6 +25,10 @@ echo "Killing health server..."
 kill %1 2>/dev/null
 sleep 1
 
+# Add pgbouncer=true so Prisma doesn't use prepared statements through pooler
+export DATABASE_CONNECTION_URI="${DATABASE_CONNECTION_URI}?pgbouncer=true"
+echo "DB URI (pgbouncer mode): $(echo $DATABASE_CONNECTION_URI | sed 's/:W[^@]*@/:****@/')"
+
 # Copy migration files
 echo "Setting up Prisma migrations..."
 rm -rf ./prisma/migrations 2>/dev/null
